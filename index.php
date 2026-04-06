@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function testMistralKey($key) {
     $url = "https://api.mistral.ai/v1/chat/completions";
     $data = [
-        "model" => "pixtral-12b-2409",
+        "model" => "mistral-small-latest", // Modèle rapide pour le test
         "messages" => [["role" => "user", "content" => "OK"]],
         "max_tokens" => 5
     ];
@@ -969,7 +969,7 @@ function testMistralKey($key) {
         <div id="step3" class="step">
             <div class="card">
                 <div class="section-title">Construction de l'app 🛠️</div>
-                <div class="section-sub">Modèle <strong style="color:var(--primary)">pixtral-12b-2409</strong> — génération du code complet…</div>
+                <div class="section-sub">Modèle <strong style="color:var(--primary)">mistral-large-latest</strong> — génération du code complet…</div>
 
                 <div class="progress-center">
                     <div class="progress-ring-wrap">
@@ -1141,7 +1141,7 @@ function testMistralKey($key) {
     loadKeys();
 
     // ===== MOTEUR IA - RETRY INFINI =====
-    async function callMistral(prompt, isJson = false, maxTokens = 2000) {
+    async function callMistral(prompt, isJson = false, maxTokens = 4000, timeoutMs = 120000) {
         let keys = await loadKeys();
         if (keys.length === 0) throw new Error("Aucune clé API. Ajoutez-en une dans le panneau de configuration.");
 
@@ -1162,11 +1162,15 @@ function testMistralKey($key) {
 
             try {
                 const body = {
-                    model: 'pixtral-12b-2409',
+                    model: 'mistral-large-latest', // Modèle optimisé pour le code
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: maxTokens,
                     temperature: isJson ? 0.2 : 0.7
                 };
+
+                // Création d'un controller pour le timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
                 const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
                     method: 'POST',
@@ -1174,8 +1178,11 @@ function testMistralKey($key) {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${key}`
                     },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify(body),
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
 
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
@@ -1207,6 +1214,10 @@ function testMistralKey($key) {
 
             } catch (e) {
                 console.warn(`[Attempt ${attempt}] Key …${key.slice(-6)}: ${e.message}`);
+                // Gestion explicite du timeout
+                if (e.name === 'AbortError' || e.message.includes('timeout')) {
+                    console.warn(`⏱️ Timeout après ${timeoutMs/1000}s pour la clé …${key.slice(-6)}`);
+                }
                 keyIndex++;
             }
         }
@@ -1313,8 +1324,8 @@ Format strict :
 Le fichier index.html doit être COMPLET (doctype, head avec styles, body avec contenu, scripts).`;
 
         try {
-            log('log3', 'Génération du code source (peut prendre 30-60s)…', 'warn');
-            updateRing(30, `<strong>Génération en cours…</strong><br>pixtral-12b-2409`);
+            log('log3', 'Génération du code source (peut prendre 60-120s)…', 'warn');
+            updateRing(30, `<strong>Génération en cours…</strong><br>mistral-large-latest (timeout 120s)`);
 
             // Simuler progression pendant le chargement
             let fakeProgress = 30;
@@ -1325,7 +1336,7 @@ Le fichier index.html doit être COMPLET (doctype, head avec styles, body avec c
                 }
             }, 2000);
 
-            const raw = await callMistral(prompt, true, 8000);
+            const raw = await callMistral(prompt, true, 12000, 120000);
             clearInterval(progressInterval);
 
             updateRing(85, 'Validation du code…');
