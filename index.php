@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function testMistralKey($key) {
     $url = "https://api.mistral.ai/v1/chat/completions";
     $data = [
-        "model" => "mistral-small-latest", // Modèle rapide pour le test
+        "model" => "pixtral-12b-2409", // Modèle rapide pour le test
         "messages" => [["role" => "user", "content" => "OK"]],
         "max_tokens" => 5
     ];
@@ -1163,7 +1163,7 @@ function testMistralKey($key) {
 
             try {
                 const body = {
-                    model: 'mistral-large-latest', // Modèle optimisé pour le code
+                    model: 'pixtral-12b-2409', // Modèle optimisé pour le code
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: maxTokens,
                     temperature: isJson ? 0.2 : 0.7
