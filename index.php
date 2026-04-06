@@ -31,12 +31,11 @@ try {
     // Insérer les clés par défaut si la table est vide
     $count = $db->query("SELECT COUNT(*) FROM api_keys")->fetchColumn();
     if ($count == 0) {
+        // Clés par défaut vides - l'utilisateur doit ajouter ses propres clés
         $defaultKeys = [
-            '  api key ',
-            '  api key ',
-            '  api key '
+            'votre_cle_mistral_ici_remplacer_par_vraie_cle',
         ];
-        $stmt = $db->prepare("INSERT OR IGNORE INTO api_keys (api_key, is_valid) VALUES (:key, 1)");
+        $stmt = $db->prepare("INSERT OR IGNORE INTO api_keys (api_key, is_valid) VALUES (:key, 0)");
         foreach ($defaultKeys as $k) {
             $stmt->execute([':key' => $k]);
         }
@@ -1141,9 +1140,11 @@ function testMistralKey($key) {
     loadKeys();
 
     // ===== MOTEUR IA - RETRY INFINI =====
-    async function callMistral(prompt, isJson = false, maxTokens = 4000, timeoutMs = 120000) {
+    async function callMistral(prompt, isJson = false, maxTokens = 12000, timeoutMs = 180000) {
         let keys = await loadKeys();
-        if (keys.length === 0) throw new Error("Aucune clé API. Ajoutez-en une dans le panneau de configuration.");
+        // Filtrer les clés invalides ou placeholder
+        keys = keys.filter(k => k && k.length > 20 && !k.includes('votre_cle') && !k.includes('api key'));
+        if (keys.length === 0) throw new Error("Aucune clé API valide. Ajoutez une vraie clé Mistral dans le panneau de configuration (en bas de page).");
 
         let attempt = 0;
         let keyIndex = 0;
@@ -1155,7 +1156,7 @@ function testMistralKey($key) {
             if (attempt > 1) {
                 $('retryBanner').classList.add('show');
                 $('retryMsg').textContent = `Tentative ${attempt} (clé …${key.slice(-6)})`;
-                await sleep(1200);
+                await sleep(1500);
                 // Recharger les clés à chaque nouveau tour complet
                 if (keyIndex % keys.length === 0) keys = await loadKeys();
             }
@@ -1172,6 +1173,8 @@ function testMistralKey($key) {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+                log('log3', `Appel API avec clé …${key.slice(-6)} (timeout ${timeoutMs/1000}s)…`, 'info');
+
                 const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
                     method: 'POST',
                     headers: {
@@ -1186,7 +1189,9 @@ function testMistralKey($key) {
 
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
-                    throw new Error(err.message || `HTTP ${res.status}`);
+                    const errorMsg = err.message || `HTTP ${res.status}`;
+                    log('log3', `Erreur API: ${errorMsg}`, 'error');
+                    throw new Error(errorMsg);
                 }
 
                 const data = await res.json();
@@ -1216,9 +1221,14 @@ function testMistralKey($key) {
                 console.warn(`[Attempt ${attempt}] Key …${key.slice(-6)}: ${e.message}`);
                 // Gestion explicite du timeout
                 if (e.name === 'AbortError' || e.message.includes('timeout')) {
-                    console.warn(`⏱️ Timeout après ${timeoutMs/1000}s pour la clé …${key.slice(-6)}`);
+                    log('log3', `⏱️ Timeout après ${timeoutMs/1000}s pour la clé …${key.slice(-6)}`, 'warn');
                 }
                 keyIndex++;
+                // Si on a fait le tour de toutes les clés, afficher un message clair
+                if (keyIndex >= keys.length && attempt > 1) {
+                    log('log3', `Toutes les clés ont échoué. Vérifiez vos clés API ou ajoutez-en une nouvelle.`, 'error');
+                    throw new Error("Échec après plusieurs tentatives avec toutes les clés disponibles.");
+                }
             }
         }
     }
@@ -1324,19 +1334,19 @@ Format strict :
 Le fichier index.html doit être COMPLET (doctype, head avec styles, body avec contenu, scripts).`;
 
         try {
-            log('log3', 'Génération du code source (peut prendre 60-120s)…', 'warn');
-            updateRing(30, `<strong>Génération en cours…</strong><br>mistral-large-latest (timeout 120s)`);
+            log('log3', `Génération du code source (peut prendre 90-180s)…`, 'warn');
+            updateRing(30, `<strong>Génération en cours…</strong><br>mistral-large-latest (timeout 180s, ${maxTokens} tokens)`);
 
             // Simuler progression pendant le chargement
             let fakeProgress = 30;
             const progressInterval = setInterval(() => {
                 if (fakeProgress < 80) {
-                    fakeProgress += Math.random() * 5;
-                    updateRing(Math.round(fakeProgress), `<strong>Génération en cours…</strong>`);
+                    fakeProgress += Math.random() * 3;
+                    updateRing(Math.round(fakeProgress), `<strong>Génération en cours…</strong><br>${Math.round(fakeProgress)}%`);
                 }
-            }, 2000);
+            }, 3000);
 
-            const raw = await callMistral(prompt, true, 12000, 120000);
+            const raw = await callMistral(prompt, true, maxTokens, 180000);
             clearInterval(progressInterval);
 
             updateRing(85, 'Validation du code…');
