@@ -153,7 +153,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function testMistralKey($key) {
     $url = "https://api.mistral.ai/v1/chat/completions";
     $data = [
+ problème-création-application-d8bc8
         "model" => "pixtral-12b-2409", // Modèle pour le test
+=======
+        "model" => "pixtral-12b-2409", // Modèle rapide pour le test
+ main
         "messages" => [["role" => "user", "content" => "OK"]],
         "max_tokens" => 5
     ];
@@ -1163,7 +1167,11 @@ function testMistralKey($key) {
 
             try {
                 const body = {
+ problème-création-application-d8bc8
                     model: 'pixtral-12b-2409', // Modèle unique - jamais d'autre
+=======
+                    model: 'pixtral-12b-2409', // Modèle optimisé pour le code
+main
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: maxTokens,
                     temperature: isJson ? 0.2 : 0.7
